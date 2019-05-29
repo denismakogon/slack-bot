@@ -17,7 +17,11 @@ WEATHER_PATTERN = ", what’s the current weather in"
 POLL_MAP = collections.defaultdict(dict)
 
 
-def get_weather_client():
+def get_weather_client() -> weather.YahooWeather:
+    """
+    Yahoo weather client init func
+    :return:
+    """
     return weather.YahooWeather(
         APP_ID=os.getenv("YAHOO_WEATHER_APP_ID"),
         api_key=os.getenv("YAHOO_WEATHER_API_KEY"),
@@ -26,6 +30,11 @@ def get_weather_client():
 
 
 def get_poll_options(message: str) -> list:
+    """
+    Turns string into a list of poll options
+    :param message:
+    :return:
+    """
     parts = message.split(CREATE_POLL_EVENT_PATTERN)
     if len(parts) > 1:
         votes = parts[-1].split(",")
@@ -37,6 +46,11 @@ def get_poll_options(message: str) -> list:
 
 
 def create_poll(poll_options: list) -> dict:
+    """
+    Creates a poll of a list of options
+    :param poll_options:
+    :return:
+    """
     poll_opts_map = {}
     for opt in poll_options:
         poll_opts_map.update({opt.lstrip(" ").rstrip(" "): 0})
@@ -45,6 +59,14 @@ def create_poll(poll_options: list) -> dict:
 
 
 def create_poll_and_respond(slack_client, slack_channel, username, message):
+    """
+    High-level poll creator
+    :param slack_client:
+    :param slack_channel:
+    :param username:
+    :param message:
+    :return:
+    """
     next_id = len(POLL_MAP.keys()) + 1
     opts = get_poll_options(message)
     if len(opts) > 0:
@@ -66,6 +88,13 @@ def create_poll_and_respond(slack_client, slack_channel, username, message):
 
 
 def post_message(slack_client, slack_channel, msg):
+    """
+    Posts a message to a channel
+    :param slack_client:
+    :param slack_channel:
+    :param msg:
+    :return:
+    """
     slack_client.chat_postMessage(
         channel=slack_channel,
         text=msg,
@@ -73,6 +102,11 @@ def post_message(slack_client, slack_channel, msg):
 
 
 def setup_statistics(vote_id):
+    """
+    Does stats calculations
+    :param vote_id:
+    :return:
+    """
     opts = POLL_MAP[vote_id]
     str_opts = [f"Poll #{vote_id} results: ", ]
     total = sum(opts.values())
@@ -83,6 +117,14 @@ def setup_statistics(vote_id):
 
 
 def accept_vote(slack_client, slack_channel, username, message: str):
+    """
+    High-level vote acceptor
+    :param slack_client:
+    :param slack_channel:
+    :param username:
+    :param message:
+    :return:
+    """
     parts = message.split(ACCEPT_VOTE_PATTERN)
     if len(parts) > 1:
         id_vote = parts[-1]
@@ -125,7 +167,12 @@ def accept_vote(slack_client, slack_channel, username, message: str):
         )
 
 
-def collect_stats(message):
+def collect_stats(message) -> tuple:
+    """
+    Stats collector
+    :param message:
+    :return:
+    """
     stats = ""
     vote_id = None
     parts = message.split("#")
@@ -136,7 +183,12 @@ def collect_stats(message):
     return vote_id, stats
 
 
-def get_weather(message):
+def get_weather(message) -> tuple:
+    """
+    Allocates weather info based on the submitted message
+    :param message:
+    :return:
+    """
     parts = message.split(WEATHER_PATTERN)
     if len(parts) > 1:
         possible_location = parts[-1].rstrip("?")
@@ -149,11 +201,15 @@ def get_weather(message):
                 condition.temperature)
 
 
-def parse_bot_commands(slack_client, slack_channel, username, message):
+def parse_bot_commands(slack_client: slack.WebClient, slack_channel: str,
+                       username: str, message: str):
     """
-        Parses a list of events coming from the Slack RTM API to find bot commands.
-        If a bot command is found, this function returns a tuple of command and channel.
-        If its not found, then this function returns None, None.
+    High-level message parser
+    :param slack_client:
+    :param slack_channel:
+    :param username:
+    :param message:
+    :return:
     """
 
     if CREATE_POLL_EVENT_PATTERN in message:
@@ -186,13 +242,13 @@ def parse_bot_commands(slack_client, slack_channel, username, message):
             post_message(slack_client, slack_channel,
                          f"It’s currently {condition} in {loc}, "
                          f"temperature is {temperature} degrees celsius.")
-        except Exception:
+        except Exception as _:
             post_message(slack_client, slack_channel,
                          "weather info is not available at this moment.")
 
 
 @slack.RTMClient.run_on(event='message')
-def say_hello(**payload):
+def processor(**payload):
     data = payload['data']
     web_client: slack.WebClient = payload['web_client']
     msg = data.get("text")
